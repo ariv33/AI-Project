@@ -1,0 +1,17 @@
+# Python compilation environment files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local virtual runtime storage folders
+.venv/
+venv/
+ENV/
+env/
+
+# Sensitive credentials & application configuration
+.env
+
+# System structural cache artifacts
+.DS_Store
+Thumbs.db

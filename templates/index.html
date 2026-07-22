@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriShield AI | Advanced Deepfake Interceptor & Anti-Scam Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #030712;
+        }
+        .font-mono-code {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        @keyframes scan-glow {
+            0% { top: 0%; opacity: 0.8; }
+            50% { top: 100%; opacity: 1; }
+            100% { top: 0%; opacity: 0.8; }
+        }
+        .animate-scan {
+            animation: scan-glow 2.2s ease-in-out infinite;
+        }
+        .cyber-grid {
+            background-image: radial-gradient(rgba(14, 165, 233, 0.12) 1px, transparent 0);
+            background-size: 32px 32px;
+        }
+        .glow-cyan {
+            box-shadow: 0 0 40px -10px rgba(6, 182, 212, 0.3);
+        }
+        .fade-in {
+            animation: fadeIn 0.35s ease-in-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen selection:bg-cyan-500 selection:text-slate-950 cyber-grid relative overflow-x-hidden">
+
+    <!-- Ambient Gradient Backdrops -->
+    <div class="fixed top-0 left-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-[128px] pointer-events-none z-0"></div>
+    <div class="fixed top-1/3 right-10 w-96 h-96 bg-blue-600/10 rounded-full blur-[128px] pointer-events-none z-0"></div>
+
+    <!-- Navigation Header -->
+    <header class="border-b border-slate-800/80 backdrop-blur-xl bg-slate-950/80 sticky top-0 z-50 transition-all">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="showLandingView()">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-cyan-500/25 ring-1 ring-white/20">
+                    V
+                </div>
+                <div>
+                    <span class="text-xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                        VeriShield <span class="text-cyan-400">AI</span>
+                    </span>
+                    <span class="block text-[10px] font-mono-code text-slate-500 tracking-widest uppercase">Forensic Defense v2.4</span>
+                </div>
+            </div>
+
+            <nav class="hidden md:flex items-center space-x-8 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <button onclick="showLandingView()" id="nav-landing-link" class="hover:text-cyan-400 transition-colors cursor-pointer">Overview</button>
+                <button onclick="showLandingView('#how-it-works')" class="hover:text-cyan-400 transition-colors cursor-pointer">Features</button>
+                <button onclick="showWorkspaceView()" id="nav-workspace-link" class="hover:text-cyan-400 transition-colors text-cyan-400 flex items-center gap-1.5 cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    Forensic Workstation
+                </button>
+            </nav>
+
+            <div class="flex items-center space-x-3">
+                <button onclick="displayDetailedDiagnostics()" id="engine-status-badge" class="text-[11px] font-mono-code font-bold px-3 py-1.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800 tracking-wider uppercase transition-all duration-300 hover:border-cyan-500/50 hover:text-cyan-300 cursor-pointer shadow-inner">
+                    Pinging Environment...
+                </button>
+
+                <!-- Auth Navigation Trigger & Profile Menu -->
+                <button onclick="openAuthModal('login')" id="auth-header-btn" class="px-3.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-mono-code font-bold uppercase transition tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H8.25" />
+                    </svg>
+                    <span>Sign In</span>
+                </button>
+
+                <div id="user-profile-menu" class="hidden items-center space-x-2">
+                    <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+                        <div id="user-avatar" class="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs flex items-center justify-center font-mono-code">
+                            U
+                        </div>
+                        <span id="user-email-display" class="text-xs text-slate-300 font-mono-code truncate max-w-[120px] sm:max-w-[160px]">user@domain.com</span>
+                    </div>
+                    <button onclick="handleSignOut()" title="Sign Out" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 transition cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- VIEW 1: LANDING PAGE -->
+    <div id="landing-view" class="fade-in min-h-[calc(100vh-80px)] flex flex-col justify-between">
+        <!-- Hero / Platform Introduction -->
+        <section id="overview" class="relative z-10 pt-16 pb-20 border-b border-slate-800/60 my-auto">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                    <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+                        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono-code font-semibold tracking-wide uppercase">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                            </svg>
+                            <span>Multi-Modal Synthetic Media Detection</span>
+                        </div>
+
+                        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1]">
+                            Neutralize AI Scams Before They Strike.
+                        </h1>
+
+                        <p class="text-base sm:text-lg text-slate-400 max-w-2xl font-normal leading-relaxed">
+                            VeriShield AI is an enterprise-grade forensic intelligence hub designed to protect families, high-risk targets, and organizations from deepfake voice cloning, synthetic imagery, and corporate authority impersonation[cite: 13].
+                        </p>
+
+                        <div class="pt-2 flex flex-wrap gap-4 justify-center lg:justify-start">
+                            <button onclick="showWorkspaceView()" class="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-sm tracking-wide uppercase shadow-lg shadow-cyan-500/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-3 cursor-pointer">
+                                <span>Launch Forensic Workstation</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                </svg>
+                            </button>
+                            <a href="#how-it-works" class="px-6 py-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-sm border border-slate-800 transition-all">
+                                How It Works
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Live Capabilities Telemetry Metrics -->
+                    <div id="how-it-works" class="lg:col-span-5 grid grid-cols-2 gap-4">
+                        <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl hover:border-cyan-500/30 transition">
+                            <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-3 font-mono-code font-bold text-sm">01</div>
+                            <h3 class="text-sm font-bold text-white mb-1">Vision Forensics</h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">Detects lighting vector discrepancies, pixel ELA warping, and boundary anomalies[cite: 13].</p>
+                        </div>
+
+                        <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl hover:border-blue-500/30 transition">
+                            <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 font-mono-code font-bold text-sm">02</div>
+                            <h3 class="text-sm font-bold text-white mb-1">Voice Clone Audit</h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">Examines spectral harmonic breaks, room echo dropouts, and breath gaps[cite: 13].</p>
+                        </div>
+
+                        <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl hover:border-indigo-500/30 transition">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3 font-mono-code font-bold text-sm">03</div>
+                            <h3 class="text-sm font-bold text-white mb-1">Lip-Sync Drift</h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">Maps lip movement fluidity against natural biometric cadence profiles[cite: 13].</p>
+                        </div>
+
+                        <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl hover:border-emerald-500/30 transition">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 font-mono-code font-bold text-sm">04</div>
+                            <h3 class="text-sm font-bold text-white mb-1">Shield Action</h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">Provides immediate, practical steps to protect family members from extortion scams[cite: 13].</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- VIEW 2: ACTUAL APPLICATION WORKSPACE (Hidden initially) -->
+    <div id="workspace-view" class="hidden fade-in min-h-[calc(100vh-80px)]">
+        <main id="workspace" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+            
+            <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
+                <div>
+                    <button onclick="showLandingView()" class="inline-flex items-center gap-1.5 text-xs font-mono-code text-slate-400 hover:text-cyan-400 transition mb-2 cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                        </svg>
+                        <span>Return to Overview</span>
+                    </button>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                        Forensic Target Workspace
+                    </h2>
+                </div>
+                <p class="text-xs text-slate-400 max-w-md">
+                    Select your threat context, upload suspicious audio, video, or image assets, or inject sample attacks to evaluate telemetry outputs[cite: 13].
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- Left Controls Column -->
+                <div class="lg:col-span-5 space-y-6">
+                    
+                    <!-- Target Acquisition Box -->
+                    <div class="backdrop-blur-xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+                        <h2 class="text-sm font-bold text-white mb-4 uppercase tracking-wider font-mono-code flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 mr-2.5 animate-ping"></span>
+                            Forensic Target Acquisition
+                        </h2>
+
+                        <div class="mb-4">
+                            <label for="threat-context" class="block text-[11px] font-mono-code font-semibold uppercase tracking-wider text-slate-400 mb-2">Threat Vectors & Context Baseline</label>
+                            <select id="threat-context" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition duration-200 font-medium">
+                                <option value="emergency">Family Emergency Urgency (High Risk Baseline)</option>
+                                <option value="corporate">Corporate Authority Mandate / Whistleblower</option>
+                                <option value="social">Social Media Public Figure Profiling</option>
+                                <option value="unknown">Unsolicited Encrypted Messaging Channel</option>
+                            </select>
+                        </div>
+
+                        <div id="drop-zone" class="border-2 border-dashed border-slate-800 rounded-xl p-6 text-center hover:border-cyan-500/50 hover:bg-slate-950/60 transition-all duration-300 cursor-pointer bg-slate-950/40 group relative overflow-hidden min-h-[200px] flex flex-col justify-center items-center">
+                            
+                            <div id="preview-sandbox" class="w-full hidden mb-2 relative rounded-lg overflow-hidden max-h-52 bg-slate-950 flex items-center justify-center border border-slate-800">
+                                <div id="xray-line" class="absolute left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#06b6d4] opacity-0 top-0 z-30 pointer-events-none"></div>
+                                
+                                <div id="preview-img-container" class="relative hidden z-10 max-w-full max-h-52">
+                                    <img id="preview-img" class="max-w-full max-h-52 object-contain" src="" alt="Forensic Preview Target">
+                                    <div id="heatmap-overlay" class="absolute inset-0 pointer-events-none"></div>
+                                </div>
+                                <video id="preview-video" class="max-w-full max-h-52 hidden z-10 rounded" controls muted playsinline></video>
+                                <div id="preview-audio" class="w-full p-4 hidden flex flex-col items-center space-y-2 z-10 text-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10 text-cyan-400 animate-pulse">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                                    </svg>
+                                    <span class="text-xs font-mono-code text-slate-300 truncate w-full" id="audio-filename">audio.wav</span>
+                                    <audio id="preview-audio-element" class="w-full h-8 mt-1" controls></audio>
+                                </div>
+                            </div>
+
+                            <div id="drop-zone-content" class="space-y-3 transition duration-300">
+                                <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 mx-auto flex items-center justify-center text-slate-400 group-hover:text-cyan-400 group-hover:border-cyan-500/40 transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono-code">Drag & Drop Target Media</p>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Supports WAV, MP3, MP4, PNG, JPG, WEBP up to 25MB</p>
+                                </div>
+                            </div>
+                            <input type="file" id="file-input" class="hidden" accept="audio/*,video/*,image/*">
+                        </div>
+                    </div>
+
+                    <!-- Injection Playground -->
+                    <div class="backdrop-blur-xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 font-mono-code flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1.5 text-cyan-400">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Mock Threat Injector
+                        </h2>
+                        <p class="text-[11px] text-slate-500 mb-4">Instantly load sandboxed attack signatures to test UI feedback pipelines and visual scoring instruments[cite: 13].</p>
+                        
+                        <div class="space-y-2.5">
+                            <button onclick="injectMockSample('audio')" class="w-full text-left p-3 rounded-xl border border-slate-800/80 bg-slate-950/60 hover:bg-slate-950 hover:border-red-500/40 transition-all duration-200 flex items-center justify-between group cursor-pointer">
+                                <div>
+                                    <span class="font-bold text-xs text-slate-200 group-hover:text-red-400 transition block">Scenario A: Grandchild Voice Clone</span>
+                                    <span class="text-[10px] text-slate-500 block mt-0.5">Generative AI synthesized audio wave match</span>
+                                </div>
+                                <span class="px-2 py-1 rounded bg-red-500/10 text-red-400 font-mono-code font-bold text-[10px] border border-red-500/20">HIGH RISK</span>
+                            </button>
+
+                            <button onclick="injectMockSample('video')" class="w-full text-left p-3 rounded-xl border border-slate-800/80 bg-slate-950/60 hover:bg-slate-950 hover:border-red-500/40 transition-all duration-200 flex items-center justify-between group cursor-pointer">
+                                <div>
+                                    <span class="font-bold text-xs text-slate-200 group-hover:text-red-400 transition block">Scenario B: Corporate Authority Mandate</span>
+                                    <span class="text-[10px] text-slate-500 block mt-0.5">Deepfake video sync exhibiting lip-sync deviations</span>
+                                </div>
+                                <span class="px-2 py-1 rounded bg-red-500/10 text-red-400 font-mono-code font-bold text-[10px] border border-red-500/20">HIGH RISK</span>
+                            </button>
+
+                            <button onclick="injectMockSample('clean')" class="w-full text-left p-3 rounded-xl border border-slate-800/80 bg-slate-950/60 hover:bg-slate-950 hover:border-emerald-500/40 transition-all duration-200 flex items-center justify-between group cursor-pointer">
+                                <div>
+                                    <span class="font-bold text-xs text-slate-200 group-hover:text-emerald-400 transition block">Scenario C: Authentic Family Frame</span>
+                                    <span class="text-[10px] text-slate-500 block mt-0.5">Unmodified standard camera capture snapshot</span>
+                                </div>
+                                <span class="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 font-mono-code font-bold text-[10px] border border-emerald-500/20">LOW RISK</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Telemetry & Results Column -->
+                <div class="lg:col-span-7 space-y-6">
+                    
+                    <!-- Placeholder Screen -->
+                    <div id="results-placeholder" class="border border-dashed border-slate-800 rounded-2xl p-12 text-center flex flex-col justify-center items-center backdrop-blur-xl bg-slate-900/30 min-h-[380px]">
+                        <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 mb-4 animate-pulse">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h9m-9 3.75h9m-9 3.75h9M3.75 6.153c0-.58.4-1.07.954-1.157a41.139 41.139 0 0118.592 0c.554.087.954.576.954 1.156v13.142c0 .58-.4 1.07-.954 1.157a41.14 41.14 0 01-18.592 0c-.554-.087-.954-.576-.954-1.157V6.153z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-300 font-mono-code uppercase tracking-wider">Awaiting Media Asset Acquisition</h3>
+                        <p class="text-xs text-slate-500 max-w-sm mt-1.5 leading-relaxed">Load sample diagnostic threats or execute native client drops to initiate machine learning processing telemetry matrices[cite: 13].</p>
+                    </div>
+
+                    <!-- Results Output Panel -->
+                    <div id="results-panel" class="hidden space-y-6">
+                        
+                        <div class="backdrop-blur-xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+                            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                                <div>
+                                    <h3 class="text-xl font-extrabold text-white tracking-tight">Forensic Assessment Complete</h3>
+                                    <div class="flex items-center space-x-2.5 mt-1">
+                                        <p class="text-xs text-slate-400 font-mono-code" id="media-evaluated-type">Target Object</p>
+                                        <span id="telemetry-badge-mode" class="text-[9px] font-mono-code px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold uppercase text-center block">--</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[10px] uppercase font-mono-code tracking-widest text-slate-500 block">Scam Risk Index</span>
+                                    <span id="risk-percentage-label" class="text-4xl font-black font-mono-code tracking-tight transition-all duration-500">0%</span>
+                                </div>
+                            </div>
+
+                            <div class="w-full bg-slate-950 border border-slate-800/80 rounded-full h-4 p-0.5 overflow-hidden">
+                                <div id="risk-meter-bar" class="h-full rounded-full w-0 transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1)"></div>
+                            </div>
+                        </div>
+
+                        <div id="diagnostic-trace-panel" class="hidden border border-amber-500/20 bg-amber-950/10 p-4 rounded-xl text-xs backdrop-blur-xl">
+                            <span class="font-bold text-amber-400 font-mono-code uppercase tracking-wider block mb-1">Engine System Log Trace</span>
+                            <p id="diagnostic-trace-text" class="font-mono-code text-slate-400 leading-normal select-all bg-slate-950/80 p-3 rounded-lg border border-slate-800/80"></p>
+                        </div>
+
+                        <div class="backdrop-blur-xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 font-mono-code">Artifact Explainability Map</h4>
+                            <div id="artifact-matrix" class="space-y-3"></div>
+                        </div>
+
+                        <!-- Shield Directive -->
+                        <div class="border border-red-500/30 rounded-2xl p-6 bg-red-950/20 backdrop-blur-xl relative overflow-hidden shadow-2xl">
+                            <div class="absolute -right-8 -bottom-8 w-28 h-28 text-red-500/5 pointer-events-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-full h-full">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                                </svg>
+                            </div>
+                            <h4 class="text-xs font-bold tracking-tight text-red-400 uppercase font-mono-code mb-2 flex items-center">
+                                <span class="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse"></span>
+                                Grandparent Shield Directive
+                            </h4>
+                            <p id="shield-summary" class="text-xs text-slate-300 font-medium mb-4 leading-relaxed">--</p>
+                            <div class="bg-slate-950/80 rounded-xl p-3 border border-slate-800 flex items-center justify-between gap-4">
+                                <p id="shield-action" class="text-xs font-mono-code text-cyan-400 tracking-wide select-all">--</p>
+                                <button onclick="copyActionDirective()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition active:scale-95 cursor-pointer whitespace-nowrap">
+                                    Copy Directive
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Privacy & Timeline Logs -->
+                    <div class="backdrop-blur-xl bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center font-mono-code">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1.5 text-cyan-400">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Privacy-First Session Scan Log
+                            </h4>
+                            <button onclick="clearScanLogs()" class="text-[10px] font-mono-code font-bold tracking-wider text-slate-500 hover:text-rose-400 uppercase transition cursor-pointer">
+                                Wipe Logs
+                            </button>
+                        </div>
+
+                        <div id="history-timeline" class="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                            <p class="text-xs text-slate-500 text-center py-4">No localized verification records captured in this session[cite: 13].</p>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Authentication Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative mx-4 overflow-hidden">
+            <!-- Modal Close Button -->
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <!-- Modal Title Header -->
+            <div class="text-center mb-6">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-cyan-500/25 ring-1 ring-white/20 mx-auto mb-3">
+                    V
+                </div>
+                <h3 id="auth-modal-title" class="text-xl font-extrabold text-white tracking-tight">Welcome to VeriShield AI</h3>
+                <p class="text-xs text-slate-400 mt-1">Authenticate using Supabase Auth or Google Cloud Console Login</p>
+            </div>
+
+            <!-- Auth Mode Toggle Tabs -->
+            <div class="flex border-b border-slate-800 mb-5">
+                <button id="tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2 text-xs font-bold font-mono-code border-b-2 border-cyan-400 text-cyan-400 transition cursor-pointer">SIGN IN</button>
+                <button id="tab-signup" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-xs font-bold font-mono-code border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition cursor-pointer">SIGN UP</button>
+            </div>
+
+            <!-- Google OAuth Button -->
+            <button onclick="handleGoogleSignIn()" class="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer mb-4">
+                <svg class="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <span>Continue with Google</span>
+            </button>
+
+            <div class="flex items-center my-4">
+                <div class="flex-grow border-t border-slate-800"></div>
+                <span class="px-3 text-[10px] font-mono-code text-slate-500 uppercase">OR WITH EMAIL</span>
+                <div class="flex-grow border-t border-slate-800"></div>
+            </div>
+
+            <!-- Status Alert Banner -->
+            <div id="auth-alert" class="hidden mb-4 p-3 rounded-xl text-xs font-mono-code border"></div>
+
+            <!-- Supabase Username/Email & Password Form -->
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-mono-code text-slate-400 mb-1">EMAIL / USERNAME</label>
+                    <input type="email" id="auth-email" required placeholder="user@verishield.ai" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition font-medium">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-mono-code text-slate-400 mb-1">PASSWORD</label>
+                    <input type="password" id="auth-password" required minlength="6" placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition font-medium">
+                </div>
+
+                <button type="submit" id="auth-submit-btn" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 transition cursor-pointer shadow-lg shadow-cyan-500/20">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 border-t border-slate-800/80 text-center text-xs text-slate-500 relative z-10">
+        <p>VeriShield AI &copy; 2026. Secure, Local-First Digital Forensic Intelligence[cite: 13].</p>
+    </footer>
+
+    <!-- Functional Scripts -->
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const xrayLine = document.getElementById('xray-line');
+        const resultsPlaceholder = document.getElementById('results-placeholder');
+        const resultsPanel = document.getElementById('results-panel');
+        const dropZoneContent = document.getElementById('drop-zone-content');
+        
+        const previewSandbox = document.getElementById('preview-sandbox');
+        const previewImgContainer = document.getElementById('preview-img-container');
+        const previewImg = document.getElementById('preview-img');
+        const heatmapOverlay = document.getElementById('heatmap-overlay');
+        const previewVideo = document.getElementById('preview-video');
+        const previewAudio = document.getElementById('preview-audio');
+        const previewAudioElement = document.getElementById('preview-audio-element');
+        const audioFilename = document.getElementById('audio-filename');
+
+        let dynamicDiagnosticCache = "Diagnostics uninitialized. Initiate validation request.";
+        let supabaseClient = null;
+        let currentAuthMode = 'login';
+
+        document.addEventListener("DOMContentLoaded", () => {
+            renderStoredHistoryLogs();
+            checkBackendEnvironmentConfig();
+            initSupabaseClient();
+        });
+
+        /* --- VIEW TRANSITION CONTROLLERS --- */
+        function showLandingView(targetSection = null) {
+            document.getElementById('landing-view').classList.remove('hidden');
+            document.getElementById('workspace-view').classList.add('hidden');
+            
+            const landingLink = document.getElementById('nav-landing-link');
+            const workspaceLink = document.getElementById('nav-workspace-link');
+            if (landingLink) landingLink.classList.add('text-cyan-400');
+            if (workspaceLink) workspaceLink.classList.remove('text-cyan-400');
+
+            if (targetSection) {
+                const el = document.querySelector(targetSection);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function showWorkspaceView() {
+            document.getElementById('landing-view').classList.add('hidden');
+            document.getElementById('workspace-view').classList.remove('hidden');
+
+            const landingLink = document.getElementById('nav-landing-link');
+            const workspaceLink = document.getElementById('nav-workspace-link');
+            if (landingLink) landingLink.classList.remove('text-cyan-400');
+            if (workspaceLink) workspaceLink.classList.add('text-cyan-400');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function initSupabaseClient() {
+            try {
+                const res = await fetch('/api/config');
+                const config = await res.json();
+                
+                if (config.supabase_url && config.supabase_anon_key && window.supabase) {
+                    supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+                    checkAuthSession();
+                } else {
+                    console.warn("Supabase credentials unconfigured in environment. Authentication client dormant.");
+                }
+            } catch (e) {
+                console.error("Auth initialization error:", e);
+            }
+        }
+
+        async function checkBackendEnvironmentConfig() {
+            const badge = document.getElementById('engine-status-badge');
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                dynamicDiagnosticCache = JSON.stringify(data.diagnostics, null, 2);
+                
+                if(data.groq_active) {
+                    badge.textContent = "Live Groq AI Processing";
+                    badge.className = "text-[11px] font-mono-code font-bold px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 tracking-wider uppercase transition-all duration-300 hover:bg-emerald-500/20 cursor-pointer shadow-inner";
+                } else {
+                    badge.textContent = "Local Simulation Engine Active";
+                    badge.className = "text-[11px] font-mono-code font-bold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wider uppercase transition-all duration-300 hover:bg-amber-500/20 cursor-pointer shadow-inner";
+                }
+            } catch(e) {
+                badge.textContent = "Backend Disconnected";
+                badge.className = "text-[11px] font-mono-code font-bold px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 tracking-wider uppercase shadow-inner";
+            }
+        }
+
+        function displayDetailedDiagnostics() {
+            alert(`--- VeriShield Environment Diagnostics ---\n${dynamicDiagnosticCache}\n\nTip: Click the 'Wipe Logs' link or check the system console maps if your changes are cached.`);
+        }
+
+        /* --- AUTHENTICATION UI & INTERACTION HANDLERS --- */
+        function openAuthModal(mode = 'login') {
+            switchAuthTab(mode);
+            const modal = document.getElementById('auth-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+            hideAuthAlert();
+        }
+
+        function switchAuthTab(mode) {
+            currentAuthMode = mode;
+            const tabLogin = document.getElementById('tab-login');
+            const tabSignup = document.getElementById('tab-signup');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const modalTitle = document.getElementById('auth-modal-title');
+
+            if (mode === 'login') {
+                tabLogin.className = 'flex-1 py-2 text-xs font-bold font-mono-code border-b-2 border-cyan-400 text-cyan-400 transition cursor-pointer';
+                tabSignup.className = 'flex-1 py-2 text-xs font-bold font-mono-code border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition cursor-pointer';
+                submitBtn.textContent = 'Sign In';
+                modalTitle.textContent = 'Sign In to VeriShield AI';
+            } else {
+                tabSignup.className = 'flex-1 py-2 text-xs font-bold font-mono-code border-b-2 border-cyan-400 text-cyan-400 transition cursor-pointer';
+                tabLogin.className = 'flex-1 py-2 text-xs font-bold font-mono-code border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition cursor-pointer';
+                submitBtn.textContent = 'Create Account';
+                modalTitle.textContent = 'Create VeriShield Account';
+            }
+            hideAuthAlert();
+        }
+
+        function showAuthAlert(message, isError = true) {
+            const alert = document.getElementById('auth-alert');
+            alert.textContent = message;
+            alert.classList.remove('hidden', 'bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20', 'bg-rose-500/10', 'text-rose-400', 'border-rose-500/20');
+            if (isError) {
+                alert.classList.add('bg-rose-500/10', 'text-rose-400', 'border-rose-500/20');
+            } else {
+                alert.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20');
+            }
+        }
+
+        function hideAuthAlert() {
+            const alert = document.getElementById('auth-alert');
+            alert.classList.add('hidden');
+        }
+
+        async function handleAuthSubmit(event) {
+            event.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+
+            if (!supabaseClient) {
+                showAuthAlert("Supabase is unconfigured. Please add SUPABASE_URL and SUPABASE_ANON_KEY to your .env file.", true);
+                return;
+            }
+
+            try {
+                if (currentAuthMode === 'login') {
+                    const { data, error } = await supabaseClient.auth.signInWithPassword({
+                        email: email,
+                        password: password
+                    });
+                    if (error) throw error;
+                    showAuthAlert("Sign in successful!", false);
+                    updateUserUI(data.user);
+                    setTimeout(closeAuthModal, 1000);
+                } else {
+                    const { data, error } = await supabaseClient.auth.signUp({
+                        email: email,
+                        password: password
+                    });
+                    if (error) throw error;
+                    showAuthAlert("Registration successful! Check your email for verification.", false);
+                    if (data.user) {
+                        updateUserUI(data.user);
+                        setTimeout(closeAuthModal, 1500);
+                    }
+                }
+            } catch (err) {
+                showAuthAlert(err.message || "Authentication failed.", true);
+            }
+        }
+
+        async function handleGoogleSignIn() {
+            if (!supabaseClient) {
+                showAuthAlert("Supabase is unconfigured. Google OAuth requires SUPABASE_URL and SUPABASE_ANON_KEY in environment variables.", true);
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+                if (error) throw error;
+            } catch (err) {
+                showAuthAlert(err.message || "Google OAuth initialization failed.", true);
+            }
+        }
+
+        async function handleSignOut() {
+            if (supabaseClient) {
+                await supabaseClient.auth.signOut();
+            }
+            updateUserUI(null);
+        }
+
+        function updateUserUI(user) {
+            const authHeaderBtn = document.getElementById('auth-header-btn');
+            const userProfileMenu = document.getElementById('user-profile-menu');
+            const userEmailDisplay = document.getElementById('user-email-display');
+            const userAvatar = document.getElementById('user-avatar');
+
+            if (user) {
+                if (authHeaderBtn) authHeaderBtn.classList.add('hidden');
+                if (userProfileMenu) userProfileMenu.classList.remove('hidden');
+                if (userEmailDisplay) userEmailDisplay.textContent = user.email || 'Authenticated User';
+                if (userAvatar) userAvatar.textContent = (user.email ? user.email[0] : 'U').toUpperCase();
+            } else {
+                if (authHeaderBtn) authHeaderBtn.classList.remove('hidden');
+                if (userProfileMenu) userProfileMenu.classList.add('hidden');
+            }
+        }
+
+        async function checkAuthSession() {
+            if (!supabaseClient) return;
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session && session.user) {
+                    updateUserUI(session.user);
+                }
+                
+                supabaseClient.auth.onAuthStateChange((_event, session) => {
+                    if (session && session.user) {
+                        updateUserUI(session.user);
+                    } else {
+                        updateUserUI(null);
+                    }
+                });
+            } catch (e) {
+                console.error("Auth session check error:", e);
+            }
+        }
+
+        /* --- FORENSIC SCANNER WORKSPACE LISTENERS --- */
+        dropZone.addEventListener('click', (e) => {
+            if(e.target.closest('#preview-sandbox') || e.target.closest('video') || e.target.closest('audio')) return;
+            fileInput.click();
+        });
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-cyan-500', 'bg-cyan-500/5');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-cyan-500', 'bg-cyan-500/5');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-cyan-500', 'bg-cyan-500/5');
+            if (e.dataTransfer.files.length > 0) {
+                renderAndAnalyzeFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                renderAndAnalyzeFile(e.target.files[0]);
+            }
+        });
+
+        function renderAndAnalyzeFile(file) {
+            previewImgContainer.classList.add('hidden');
+            previewVideo.classList.add('hidden');
+            previewAudio.classList.add('hidden');
+            heatmapOverlay.innerHTML = '';
+            previewSandbox.classList.remove('hidden');
+            
+            const objectURL = URL.createObjectURL(file);
+            let simulatedDesignator = 'image';
+
+            if (file.type.startsWith('image/')) {
+                previewImg.src = objectURL;
+                previewImgContainer.classList.remove('hidden');
+                simulatedDesignator = 'image'; 
+            } else if (file.type.startsWith('video/')) {
+                previewVideo.src = objectURL;
+                previewVideo.classList.remove('hidden');
+                simulatedDesignator = 'video';
+            } else if (file.type.startsWith('audio/')) {
+                audioFilename.textContent = file.name;
+                previewAudioElement.src = objectURL;
+                previewAudio.classList.remove('hidden');
+                simulatedDesignator = 'audio';
+            }
+
+            handleAssetAnalysis(file.name, simulatedDesignator, file);
+        }
+
+        function injectMockSample(type) {
+            previewImgContainer.classList.add('hidden');
+            previewVideo.classList.add('hidden');
+            previewAudio.classList.add('hidden');
+            heatmapOverlay.innerHTML = '';
+            previewSandbox.classList.remove('hidden');
+
+            let name = "";
+            if (type === 'audio') {
+                name = "grandchild_voice_urgent_clone.wav";
+                audioFilename.textContent = name;
+                previewAudioElement.src = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+                previewAudio.classList.remove('hidden');
+            }
+            if (type === 'video') {
+                name = "ceo_authority_mandate_wire.mp4";
+                previewVideo.src = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+                previewVideo.classList.remove('hidden');
+            }
+            if (type === 'clean') {
+                name = "family_reunion_portrait.jpg";
+                previewImg.src = "https://images.unsplash.com/photo-1590086782792-42dd2350140d?q=80&w=600&auto=format&fit=crop";
+                previewImgContainer.classList.remove('hidden');
+            }
+            
+            handleAssetAnalysis(name, type, null);
+        }
+
+        async function handleAssetAnalysis(fileName, designator, rawFile = null) {
+            resultsPanel.classList.add('hidden');
+            resultsPlaceholder.classList.remove('hidden');
+            dropZoneContent.classList.add('hidden'); 
+            xrayLine.classList.add('animate-scan', 'opacity-100');
+            heatmapOverlay.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('context', document.getElementById('threat-context').value);
+            
+            if (rawFile) {
+                formData.append('file', rawFile);
+            }
+            
+            if (['audio', 'video', 'clean'].includes(designator) && !rawFile) {
+                formData.append('mock_type', designator);
+            }
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const report = await response.json();
+                
+                xrayLine.classList.remove('animate-scan', 'opacity-100');
+                resultsPlaceholder.classList.add('hidden');
+                resultsPanel.classList.remove('hidden');
+
+                document.getElementById('media-evaluated-type').textContent = `Target: ${fileName}`;
+                
+                const modeBadge = document.getElementById('telemetry-badge-mode');
+                modeBadge.textContent = report.engine_mode || "Local Engine";
+
+                const tracePanel = document.getElementById('diagnostic-trace-panel');
+                const traceText = document.getElementById('diagnostic-trace-text');
+                if (report.engine_mode === "Local Simulation Engine") {
+                    traceText.textContent = report.diagnostic_log || "Fallback reason unassigned.";
+                    tracePanel.classList.remove('hidden');
+                } else {
+                    tracePanel.classList.add('hidden');
+                }
+
+                const labelEl = document.getElementById('risk-percentage-label');
+                labelEl.textContent = `${report.score}%`;
+                labelEl.className = `text-4xl font-black font-mono-code tracking-tight transition duration-500 ${report.textHex}`;
+
+                const barEl = document.getElementById('risk-meter-bar');
+                barEl.className = `h-full rounded-full transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1) ${report.colorClass} ${report.glow}`;
+                barEl.style.width = `${report.score}%`;
+
+                const matrixEl = document.getElementById('artifact-matrix');
+                matrixEl.innerHTML = '';
+                
+                report.indicators.forEach(ind => {
+                    const badgeColor = ind.flag ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                    const borderContext = ind.flag ? 'border-red-500/10' : 'border-slate-800/60';
+                    
+                    const row = document.createElement('div');
+                    row.className = `p-3.5 rounded-xl border ${borderContext} bg-slate-950/60 flex items-start justify-between gap-4 group relative`;
+                    row.innerHTML = `
+                        <div class="space-y-0.5 max-w-lg">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-bold text-white">${ind.title}</span>
+                                <div class="relative inline-block cursor-help group/tip">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500 hover:text-cyan-400 transition">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                                    </svg>
+                                    <div class="absolute hidden group-hover/tip:block bg-slate-950 border border-slate-700 text-slate-300 text-xs rounded-xl p-3 w-60 -top-2 left-6 z-50 shadow-2xl leading-normal pointer-events-none">
+                                        ${ind.tip}
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-normal">${ind.desc}</p>
+                        </div>
+                        <span class="text-[10px] font-mono-code font-bold px-2 py-0.5 border rounded-full tracking-wide uppercase ${badgeColor} whitespace-nowrap">${ind.state}</span>
+                    `;
+                    matrixEl.appendChild(row);
+                });
+
+                if (report.heatmap && report.heatmap.length > 0) {
+                    report.heatmap.forEach(point => {
+                        const marker = document.createElement('div');
+                        marker.className = "absolute border-2 border-red-500 bg-red-500/20 rounded-lg animate-pulse cursor-pointer pointer-events-auto group/marker";
+                        marker.style.top = `${point.top}%`;
+                        marker.style.left = `${point.left}%`;
+                        marker.style.width = `${point.width}%`;
+                        marker.style.height = `${point.height}%`;
+                        
+                        marker.innerHTML = `
+                            <div class="absolute hidden group-hover/marker:block bg-slate-950 border border-red-500/40 text-red-200 text-[10px] rounded p-2 w-40 -top-12 left-1/2 -translate-x-1/2 z-50 shadow-2xl pointer-events-none text-center font-semibold font-mono-code whitespace-normal leading-tight">
+                                ${point.label}
+                            </div>
+                        `;
+                        heatmapOverlay.appendChild(marker);
+                    });
+                }
+
+                document.getElementById('shield-summary').textContent = report.shieldText;
+                document.getElementById('shield-action').textContent = report.shieldAction;
+
+                saveLogToLocalTimeline(fileName, report.score, report.label);
+
+            } catch (error) {
+                console.error("Analysis Pipeline Exception Failure: ", error);
+                xrayLine.classList.remove('animate-scan', 'opacity-100');
+            }
+        }
+
+        function saveLogToLocalTimeline(name, score, alertLabel) {
+            let existingHistory = JSON.parse(localStorage.getItem('verishield_logs') || '[]');
+            const logEntry = {
+                id: Date.now(),
+                filename: name,
+                riskScore: score,
+                riskLabel: alertLabel,
+                timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            existingHistory.unshift(logEntry);
+            localStorage.setItem('verishield_logs', JSON.stringify(existingHistory));
+            renderStoredHistoryLogs();
+        }
+
+        function renderStoredHistoryLogs() {
+            const container = document.getElementById('history-timeline');
+            let history = JSON.parse(localStorage.getItem('verishield_logs') || '[]');
+            
+            if (history.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">No localized verification records captured in this session[cite: 13].</p>`;
+                return;
+            }
+
+            container.innerHTML = history.map(log => {
+                let textClass = 'text-emerald-400';
+                if(log.riskScore >= 40 && log.riskScore <= 69) textClass = 'text-amber-400';
+                if(log.riskScore >= 70) textClass = 'text-red-400';
+
+                return `
+                    <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-4 text-xs">
+                        <div class="truncate max-w-[70%]">
+                            <span class="font-bold text-slate-200 block truncate">${log.filename}</span>
+                            <span class="text-[10px] text-slate-500 font-mono-code">${log.timestamp}</span>
+                        </div>
+                        <div class="text-right font-mono-code">
+                            <span class="font-black text-sm block ${textClass}">${log.riskScore}%</span>
+                            <span class="text-[9px] text-slate-400 block tracking-wide uppercase">${log.riskLabel}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function clearScanLogs() {
+            if(confirm("Confirm deletion of completely secure browser scan footprints?[cite: 13]")) {
+                localStorage.removeItem('verishield_logs');
+                renderStoredHistoryLogs();
+            }
+        }
+
+        function copyActionDirective() {
+            const actionText = document.getElementById('shield-action').textContent;
+            navigator.clipboard.writeText(actionText).then(() => {
+                alert("Action directive copied to storage clipboard.");
+            });
+        }
+    </script>
+</body>
+</html>
