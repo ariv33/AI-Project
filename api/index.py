@@ -1,425 +1,541 @@
-from flask import Flask, render_template, jsonify, request
 import os
 import base64
 import json
-import hashlib
 import re
-from dotenv import load_dotenv
+import traceback
+import tempfile
+from flask import Flask, render_template, request, jsonify
 from groq import Groq
+from dotenv import load_dotenv
 
-# Establish absolute directory path tracking to prevent serverless layout resolution failures
+try:
+    import cv2
+except Exception:
+    # Catches ImportError as well as ABI-mismatch errors (e.g. AttributeError:
+    # _ARRAY_API not found, which occurs when opencv-python-headless was built
+    # against a different NumPy major version than the one installed).
+    cv2 = None
+
+load_dotenv()
+
+# 1. Properly anchor template folder to the root 'templates/' directory
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-env_path = os.path.join(base_dir, '.env')
-load_dotenv(env_path)
+templates_dir = os.path.join(base_dir, 'templates')
 
-app = Flask(__name__, template_folder='../templates')
+app = Flask(__name__, template_folder=templates_dir)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
-# Instantiate the Groq client securely from local environmental configurations
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+# Initialize Groq Client safely from environment
+groq_api_key = os.environ.get("GROQ_API_KEY")
+groq_client = Groq(api_key=groq_api_key) if groq_api_key else None
 
-# Pre-verify structural presence of the key wrapper
-groq_client = None
-key_status = "Missing entirely from system environment variables."
+# Supabase is configured client-side; the backend only needs to surface these
+# public values (anon key is safe to expose to the browser by design).
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY")
 
-if GROQ_API_KEY:
-    clean_key = GROQ_API_KEY.strip()
-    if not clean_key.startswith("gsk_"):
-        key_status = "Found, but structurally invalid. Groq API keys must begin with 'gsk_' prefix."
-    else:
-        try:
-            groq_client = Groq(api_key=clean_key)
-            key_status = f"Client initialized with key signature: {clean_key[:7]}...{clean_key[-4:]}"
-        except Exception as init_err:
-            key_status = f"Initialization error encountered: {str(init_err)}"
-else:
-    fallback_key = os.environ.get("groq_api_key") or os.environ.get("Groq_Api_Key")
-    if fallback_key:
-        key_status = "Found key using lower-case variable naming conventions. Rename key configuration to uppercase 'GROQ_API_KEY'."
+# Current Groq-hosted model IDs. llama-3.2-*-vision-preview was decommissioned;
+# qwen/qwen3.6-27b is the current Groq vision-capable model.
+MODEL_VISION = "qwen/qwen3.6-27b"
+MODEL_TEXT = "llama-3.3-70b-versatile"
 
-def extract_and_parse_json(raw_content):
-    """
-    Safely sanitizes model responses by stripping markdown blocks, conversational text,
-    model reasoning loops, unescaped internal quotes, trailing commas, and unescaped newlines.
-    """
-    clean_text = raw_content.strip()
+MOCK_SIGNATURES = {
+    "audio": {
+        "filename": "grandchild_voice_urgent_clone.wav",
+        "content_type": "audio/wav",
+        "media_type": "audio_video",
+        "report": {
+            "score": 91,
+            "label": "HIGH RISK: VOICE CLONE DETECTED",
+            "colorClass": "bg-rose-500",
+            "textHex": "text-rose-400",
+            "glow": "shadow-[0_0_15px_#f43f5e]",
+            "indicators": [
+                {
+                    "title": "Spectral Harmonic Break",
+                    "desc": "Unnatural harmonic flattening detected across the 2-4kHz vocal formant range, consistent with neural voice synthesis.",
+                    "state": "Flagged Anomaly",
+                    "flag": True,
+                    "tip": "Real human speech carries micro-jitter in formant frequencies that generative voice models tend to smooth over."
+                },
+                {
+                    "title": "Breath & Pause Cadence",
+                    "desc": "Absence of natural breath sounds and irregular pause timing typical of concatenative/neural TTS pipelines.",
+                    "state": "Flagged Anomaly",
+                    "flag": True,
+                    "tip": "Cloned voices frequently omit involuntary breathing artifacts present in live recordings."
+                },
+                {
+                    "title": "Urgency & Emotional Manipulation Script",
+                    "desc": "Narrative structure matches known 'grandchild emergency' social engineering scam templates requesting immediate wire transfer.",
+                    "state": "Scam Pattern Match",
+                    "flag": True,
+                    "tip": "High-pressure urgency combined with a request for untraceable payment is a classic scam signature."
+                }
+            ],
+            "heatmap": [],
+            "shieldText": "This audio sample matches known deepfake voice-cloning patterns used in family emergency scams. Do not act on payment requests from this call alone.",
+            "shieldAction": "Hang up and call the family member back directly on a known, previously saved phone number to verify."
+        }
+    },
+    "video": {
+        "filename": "ceo_authority_mandate_wire.mp4",
+        "content_type": "video/mp4",
+        "media_type": "audio_video",
+        "report": {
+            "score": 88,
+            "label": "HIGH RISK: DEEPFAKE VIDEO",
+            "colorClass": "bg-rose-500",
+            "textHex": "text-rose-400",
+            "glow": "shadow-[0_0_15px_#f43f5e]",
+            "indicators": [
+                {
+                    "title": "Lip-Sync Desynchronization",
+                    "desc": "Mouth movement lags audio phonemes by a measurable offset, especially on plosive consonants.",
+                    "state": "Flagged Anomaly",
+                    "flag": True,
+                    "tip": "Frame-by-frame lip movement is one of the most reliable low-level deepfake tells."
+                },
+                {
+                    "title": "Facial Boundary Blending",
+                    "desc": "Soft edge artifacts around the jawline and hairline indicative of face-swap compositing.",
+                    "state": "Flagged Anomaly",
+                    "flag": True,
+                    "tip": "Generated faces are typically composited onto a source video, leaving faint blending seams."
+                },
+                {
+                    "title": "Authority Impersonation Script",
+                    "desc": "Message content mimics a corporate executive mandate demanding an urgent, confidential wire transfer.",
+                    "state": "Scam Pattern Match",
+                    "flag": True,
+                    "tip": "Legitimate executives rarely authorize wire transfers exclusively through a single unverified video message."
+                }
+            ],
+            "heatmap": [
+                {"top": 20, "left": 30, "width": 25, "height": 25, "label": "Facial boundary blending artifact"},
+                {"top": 55, "left": 40, "width": 20, "height": 15, "label": "Lip-sync desynchronization region"}
+            ],
+            "shieldText": "This video exhibits strong indicators of synthetic face and voice manipulation consistent with corporate authority impersonation scams.",
+            "shieldAction": "Verify the instruction through a separate, pre-established channel before authorizing any transfer."
+        }
+    },
+    "clean": {
+        "filename": "family_reunion_portrait.jpg",
+        "content_type": "image/jpeg",
+        "media_type": "image",
+        "report": {
+            "score": 6,
+            "label": "LOW RISK: NO ANOMALIES DETECTED",
+            "colorClass": "bg-emerald-500",
+            "textHex": "text-emerald-400",
+            "glow": "shadow-[0_0_15px_#10b981]",
+            "indicators": [
+                {
+                    "title": "Illumination Vector Consistency",
+                    "desc": "Lighting direction and shadow falloff are consistent across all subjects and background elements.",
+                    "state": "Nominal",
+                    "flag": False,
+                    "tip": "Composited or generated imagery often shows mismatched light sources between subject and background."
+                },
+                {
+                    "title": "Sensor Noise Profile",
+                    "desc": "Uniform photon noise distribution consistent with a standard camera sensor capture, not synthetic upsampling.",
+                    "state": "Nominal",
+                    "flag": False,
+                    "tip": "AI-generated images often exhibit unnaturally smooth or repeating high-frequency noise patterns."
+                }
+            ],
+            "heatmap": [],
+            "shieldText": "No manipulation indicators were detected in this image. It is consistent with an authentic, unedited camera capture.",
+            "shieldAction": "No action required. Continue routine verification practices for unfamiliar media."
+        }
+    }
+}
+
+def extract_and_parse_json(text):
+    """Robustly extracts and parses a JSON object from raw model output."""
+    if not text:
+        raise ValueError("Received empty or null response text from AI backend.")
     
-    # Strip out any embedded chain-of-thought or model thinking structures
-    clean_text = re.sub(r'<think>.*?</think>', '', clean_text, flags=re.DOTALL)
-    clean_text = re.sub(r'<thought>.*?</thought>', '', clean_text, flags=re.DOTALL)
-    if "</think>" in clean_text:
-        clean_text = clean_text.split("</think>")[-1].strip()
-    if "</thought>" in clean_text:
-        clean_text = clean_text.split("</thought>")[-1].strip()
-
-    # Isolate string elements bounded by the root object curly brackets
-    start_idx = clean_text.find("{")
-    end_idx = clean_text.rfind("}")
-    
-    if start_idx == -1 or end_idx == -1 or end_idx <= start_idx:
+    start = text.find('{')
+    end = text.rfind('}')
+    if start == -1 or end == -1 or start > end:
         raise ValueError("The response stream did not contain an executable enclosed JSON block structure.")
-        
-    target_json_str = clean_text[start_idx:end_idx + 1]
-
-    # Fix 1: Remove trailing commas before closing braces/brackets (e.g. {"a": 1, })
-    target_json_str = re.sub(r',\s*([}\]])', r'\1', target_json_str)
-
+    
+    json_str = text[start:end+1]
+    
+    # Escape invalid control characters in raw string content
+    json_str = re.sub(
+        r'[\x00-\x1F\x7F]', 
+        lambda m: f'\\u{ord(m.group(0)):04x}' if m.group(0) not in '\n\r\t' else m.group(0), 
+        json_str
+    )
+    
     try:
-        return json.loads(target_json_str)
-    except json.JSONDecodeError:
-        pass
+        return json.loads(json_str)
+    except Exception as e:
+        raise ValueError(f"JSON Parsing failed: {str(e)}")
 
-    # Fix 2: Replace unescaped raw control newlines inside JSON text values
-    sanitized = re.sub(r'(?<!\\)\n', ' ', target_json_str)
-    sanitized = re.sub(r'(?<!\\)\r', '', sanitized)
-    sanitized = re.sub(r',\s*([}\]])', r'\1', sanitized)
-
+def extract_video_frame(file_bytes, filename):
+    """Extracts a middle keyframe from video bytes for vision model analysis."""
+    if not cv2:
+        return None
+    suffix = os.path.splitext(filename)[1] or '.mp4'
+    tmp_path = None
     try:
-        return json.loads(sanitized)
-    except json.JSONDecodeError:
-        pass
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
 
-    # Fix 3: Sanitize invalid backslash escaping sequence
-    sanitized_backslashes = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', sanitized)
-    return json.loads(sanitized_backslashes)
+        cap = cv2.VideoCapture(tmp_path)
+        if not cap.isOpened():
+            return None
+
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frame_count <= 0:
+            frame_count = 1
+
+        target_frame = max(0, min(frame_count // 2, frame_count - 1))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+
+        ret, frame = cap.read()
+        cap.release()
+
+        if not ret or frame is None:
+            return None
+
+        success, encoded_img = cv2.imencode('.jpg', frame)
+        if not success:
+            return None
+
+        return base64.b64encode(encoded_img.tobytes()).decode('utf-8')
+    except Exception:
+        return None
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+def generate_simulated_report(filename, media_type, threat_context):
+    """Fallback generator for local heuristic simulation."""
+    is_image = media_type == 'image'
+    is_video = media_type == 'video'
+
+    if is_image:
+        score = 68
+        label = "SIMULATED ANOMALY"
+        color = "bg-amber-500"
+        hex_color = "text-amber-400"
+        glow = "shadow-[0_0_15px_#f59e0b]"
+        indicators = [
+            {
+                "title": "Local Heuristic Simulation",
+                "desc": f"Analyzed image '{filename}' under context '{threat_context}' using local fallback rules.",
+                "state": "Simulated Detection",
+                "flag": True,
+                "tip": "Groq API key missing or live AI returned unparseable output."
+            },
+            {
+                "title": "Frequency Spectrum Distribution",
+                "desc": "Local noise profile flags high variance consistent with synthetic imagery.",
+                "state": "Flagged Anomaly",
+                "flag": True,
+                "tip": "Simulated evaluation of high-frequency noise bands."
+            }
+        ]
+        heatmap = [
+            {"top": 30, "left": 40, "width": 20, "height": 20, "label": "Simulated Anomaly Region 1"},
+            {"top": 60, "left": 20, "width": 15, "height": 15, "label": "Simulated Anomaly Region 2"}
+        ]
+    elif is_video:
+        score = 86
+        label = "HIGH RISK: SYNTHETIC VIDEO DETECTED"
+        color = "bg-rose-500"
+        hex_color = "text-rose-400"
+        glow = "shadow-[0_0_15px_#f43f5e]"
+        indicators = [
+            {
+                "title": "Frame-to-Frame Temporal Jitter",
+                "desc": f"Analyzed video '{filename}' under context '{threat_context}'. Detected frame interpolation variance.",
+                "state": "Simulated Detection",
+                "flag": True,
+                "tip": "Synthetic video generators often struggle with temporal consistency across adjacent frames."
+            },
+            {
+                "title": "Facial Landmark Alignment Drift",
+                "desc": "Facial boundaries show high variance along composite edges.",
+                "state": "Flagged Anomaly",
+                "flag": True,
+                "tip": "Simulated evaluation of face-swap boundary blending."
+            }
+        ]
+        heatmap = [
+            {"top": 20, "left": 30, "width": 25, "height": 25, "label": "Facial boundary blending artifact"},
+            {"top": 55, "left": 40, "width": 20, "height": 15, "label": "Lip-sync desynchronization region"}
+        ]
+    else:
+        score = 84
+        label = "HIGH SIMULATED THREAT"
+        color = "bg-rose-500"
+        hex_color = "text-rose-400"
+        glow = "shadow-[0_0_15px_#f43f5e]"
+        indicators = [
+            {
+                "title": "Local Heuristic Simulation",
+                "desc": f"Analyzed '{filename}' under context '{threat_context}' using local fallback rules.",
+                "state": "Simulated Detection",
+                "flag": True,
+                "tip": "Groq API key missing or live AI returned unparseable output."
+            }
+        ]
+        heatmap = []
+
+    return {
+        "score": score,
+        "label": label,
+        "colorClass": color,
+        "textHex": hex_color,
+        "glow": glow,
+        "indicators": indicators,
+        "heatmap": heatmap,
+        "shieldText": "Local fallback simulation active. Ensure GROQ_API_KEY is configured in your environment.",
+        "shieldAction": "Verify environment variables and re-run analysis."
+    }
 
 @app.route('/')
 def index():
-    """Renders the core forensic workspace user interface."""
     return render_template('index.html')
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
-    """Exposes public configuration parameters for client-side authentication initialization."""
     return jsonify({
-        "supabase_url": os.environ.get("SUPABASE_URL", ""),
-        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
-        "google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "")
+        'groq_configured': bool(groq_api_key),
+        'model_vision': MODEL_VISION,
+        'model_text': MODEL_TEXT,
+        'supabase_url': supabase_url,
+        'supabase_anon_key': supabase_anon_key
     })
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    """Exposes deep system sanity diagnostics including explicit API key validation checks."""
     return jsonify({
-        "status": "healthy",
-        "message": "VeriShield AI Serverless Backend is operational.",
-        "groq_active": groq_client is not None,
-        "diagnostics": {
-            "key_configured": GROQ_API_KEY is not None,
-            "key_details": key_status,
-            "env_file_monitored_at": env_path,
-            "env_file_exists_on_disk": os.path.exists(env_path),
-            "supabase_configured": bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_ANON_KEY")),
-            "google_client_id_configured": bool(os.environ.get("GOOGLE_CLIENT_ID"))
+        'status': 'healthy',
+        'groq_active': bool(groq_client),
+        'diagnostics': {
+            'groq_api_key_set': bool(groq_api_key),
+            'model_vision': MODEL_VISION,
+            'model_text': MODEL_TEXT,
+            'supabase_configured': bool(supabase_url and supabase_anon_key),
+            'opencv_available': bool(cv2)
         }
     })
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
-    """Performs advanced forensic heuristic analysis using the Groq multi-modal inference architecture."""
-    threat_context = request.form.get('context', 'unknown')
-    mock_type = request.form.get('mock_type', '')
-    
-    # Force localized processing if explicitly requested via simulation dashboard
-    if mock_type:
-        return jsonify(generate_local_forensic_report(threat_context, mock_type, request.files.get('file'), "Manual Sandbox Overwrite Triggered"))
-
+    threat_context = request.form.get('context', 'Unspecified Vector Context')
+    mock_type = request.form.get('mock_type')
     uploaded_file = request.files.get('file')
-    if not uploaded_file:
-        return jsonify({"error": "No media asset provided for forensic analysis."}), 400
 
-    # Fallback immediately if client engine failed initialization, passing along the diagnostic status trace
-    if not groq_client:
-        return jsonify(generate_local_forensic_report(threat_context, '', uploaded_file, f"API Key Unconfigured. Root State: {key_status}"))
+    # Mock Threat Injector: sandboxed canned signatures, no live inference needed.
+    if (not uploaded_file or not uploaded_file.filename) and mock_type:
+        signature = MOCK_SIGNATURES.get(mock_type)
+        if not signature:
+            return jsonify({'error': f"Unrecognized mock_type '{mock_type}'."}), 400
+        return jsonify({
+            'success': True,
+            'engine_mode': 'Mock Signature Playback',
+            'diagnostic_log': f"Loaded sandboxed attack signature '{mock_type}' for UI/telemetry testing. No live inference performed.",
+            **signature['report']
+        })
 
-    filename = uploaded_file.filename
-    content_type = uploaded_file.content_type
-    
-    # Standardize empty content types for safety extensions
-    if not content_type or content_type == 'application/octet-stream':
-        if filename.lower().endswith('.png'): content_type = 'image/png'
-        elif filename.lower().endswith('.webp'): content_type = 'image/webp'
-        else: content_type = 'image/jpeg'
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({'error': 'No file submitted in payload.'}), 400
 
+    filename = uploaded_file.filename or 'unnamed_asset'
+    content_type = uploaded_file.mimetype or ''
     file_bytes = uploaded_file.read()
-    is_image = content_type.startswith('image/') or any(filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp'])
-    
+
+    if not file_bytes:
+        return jsonify({'error': 'Submitted file is empty.'}), 400
+
+    fn_lower = filename.lower()
+    is_image = content_type.startswith('image/') or fn_lower.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'))
+    is_video = content_type.startswith('video/') or fn_lower.endswith(('.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'))
+
+    if is_image:
+        media_type = 'image'
+    elif is_video:
+        media_type = 'video'
+    else:
+        media_type = 'audio_video'
+
+    if not groq_client:
+        simulated = generate_simulated_report(filename, media_type, threat_context)
+        return jsonify({
+            'success': True,
+            'engine_mode': 'Local Simulation Engine',
+            'diagnostic_log': 'GROQ_API_KEY missing. Engine safely degraded to local heuristic simulation.',
+            **simulated
+        })
+
     try:
-        if is_image:
-            base64_image = base64.b64encode(file_bytes).decode('utf-8')
+        base64_frame = None
+        if is_video:
+            base64_frame = extract_video_frame(file_bytes, filename)
+
+        if is_image or (is_video and base64_frame):
+            if is_image:
+                base64_payload = base64.b64encode(file_bytes).decode('utf-8')
+                image_mime = content_type if content_type.startswith('image/') else 'image/jpeg'
+                prompt_text = f"Context parameters: Asset received via '{threat_context}'. Filename: {filename}. Synthesize a structured forensic analysis mapping in raw JSON."
+                system_instruction = (
+                    "You are an expert Multi-Modal Image Forensics Auditor specializing in computer vision anomaly detection.\n"
+                    "Examine the image asset strictly for signs of synthetic generation or AI manipulation, analyzing edge blending, "
+                    "illumination vectors, local noise variance, and facial landmark anomalies.\n\n"
+                    "CRITICAL STRUCTURAL & SYNTAX RULES:\n"
+                    "1. Output your entire findings as a single, valid JSON object.\n"
+                    "2. DO NOT use double quotes (\") inside text values or descriptions. Use single quotes (') for internal quotes.\n"
+                    "3. Do not include markdown code block formatting (e.g. ```json).\n"
+                    "4. Ensure strict valid JSON syntax with NO trailing commas.\n\n"
+                    "Format your JSON output EXACTLY matching this schema:\n"
+                    "{\n"
+                    "  \"score\": 72,\n"
+                    "  \"label\": \"MEDIUM RISK\",\n"
+                    "  \"colorClass\": \"bg-amber-500\",\n"
+                    "  \"textHex\": \"text-amber-400\",\n"
+                    "  \"glow\": \"shadow-[0_0_15px_#f59e0b]\",\n"
+                    "  \"indicators\": [\n"
+                    "    {\"title\": \"Artifact Title\", \"desc\": \"Analytical description\", \"state\": \"Status\", \"flag\": true, \"tip\": \"Detailed hover tooltip explanation\"}\n"
+                    "  ],\n"
+                    "  \"heatmap\": [\n"
+                    "    {\"top\": 25, \"left\": 45, \"width\": 15, \"height\": 15, \"label\": \"AI Artifact Description\"}\n"
+                    "  ],\n"
+                    "  \"shieldText\": \"Grandparent shield breakdown summary text\",\n"
+                    "  \"shieldAction\": \"Direct operational action recommendation instruction\"\n"
+                    "}"
+                )
+            else:
+                base64_payload = base64_frame
+                image_mime = 'image/jpeg'
+                prompt_text = f"Context parameters: Video asset received via '{threat_context}'. Filename: {filename}. Analyze the extracted keyframe for video deepfake markers, face-swaps, lip-sync desynchronization regions, or frame manipulation artifacts and return raw JSON."
+                system_instruction = (
+                    "You are an expert Video Deepfake Forensics Auditor.\n"
+                    "Examine this video keyframe strictly for signs of synthetic generation, facial swapping, temporal edge blending, lip-sync desynchronization, and AI manipulation.\n\n"
+                    "CRITICAL STRUCTURAL & SYNTAX RULES:\n"
+                    "1. Output your entire findings as a single, valid JSON object.\n"
+                    "2. DO NOT use double quotes (\") inside text values or descriptions. Use single quotes (') for internal quotes.\n"
+                    "3. Do not include markdown code block formatting (e.g. ```json).\n"
+                    "4. Ensure strict valid JSON syntax with NO trailing commas.\n\n"
+                    "Format your JSON output EXACTLY matching this schema:\n"
+                    "{\n"
+                    "  \"score\": 85,\n"
+                    "  \"label\": \"HIGH RISK\",\n"
+                    "  \"colorClass\": \"bg-rose-500\",\n"
+                    "  \"textHex\": \"text-rose-400\",\n"
+                    "  \"glow\": \"shadow-[0_0_15px_#f43f5e]\",\n"
+                    "  \"indicators\": [\n"
+                    "    {\"title\": \"Artifact Title\", \"desc\": \"Analytical description\", \"state\": \"Status\", \"flag\": true, \"tip\": \"Detailed hover tooltip explanation\"}\n"
+                    "  ],\n"
+                    "  \"heatmap\": [\n"
+                    "    {\"top\": 20, \"left\": 30, \"width\": 25, \"height\": 25, \"label\": \"Facial boundary blending artifact\"}\n"
+                    "  ],\n"
+                    "  \"shieldText\": \"Summary of video forensic findings\",\n"
+                    "  \"shieldAction\": \"Direct operational instruction for non-technical user\"\n"
+                    "}"
+                )
+
             messages = [
                 {
                     "role": "system",
-                    "content": (
-                        "You are an expert Multi-Modal Image Forensics Auditor specializing in computer vision anomaly detection.\n"
-                        "Examine the image asset strictly for signs of synthetic generation or AI manipulation, analyzing edge blending, "
-                        "illumination vectors, local noise variance, and facial landmark anomalies.\n\n"
-                        "CRITICAL STRUCTURAL & SYNTAX RULES:\n"
-                        "1. Output your entire findings as a single, valid JSON object.\n"
-                        "2. DO NOT use double quotes (\") inside text values or descriptions. Use single quotes (') for any quotes within string text.\n"
-                        "3. Do not include conversational introductory phrases, trailing notes, or markdown formatting blocks.\n"
-                        "4. Do not write thinking tags like <think> or <thought>.\n"
-                        "5. Ensure strict valid JSON syntax with NO trailing commas.\n\n"
-                        "Your output text must be clean JSON formatted exactly like this:\n"
-                        "{\n"
-                        "  \"score\": 72,\n"
-                        "  \"label\": \"MEDIUM RISK\",\n"
-                        "  \"colorClass\": \"bg-amber-500\",\n"
-                        "  \"textHex\": \"text-amber-400\",\n"
-                        "  \"glow\": \"shadow-[0_0_15px_#f59e0b]\",\n"
-                        "  \"indicators\": [\n"
-                        "    {\"title\": \"Artifact Title\", \"desc\": \"Analytical description\", \"state\": \"Status\", \"flag\": true, \"tip\": \"Detailed hover tooltip explanation\"}\n"
-                        "  ],\n"
-                        "  \"heatmap\": [\n"
-                        "    {\"top\": 25, \"left\": 45, \"width\": 15, \"height\": 15, \"label\": \"AI Artifact Description\"}\n"
-                        "  ],\n"
-                        "  \"shieldText\": \"Grandparent shield breakdown summary text\",\n"
-                        "  \"shieldAction\": \"Direct operational action recommendation instruction\"\n"
-                        "}"
-                    )
+                    "content": system_instruction
                 },
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "text", 
-                            "text": f"Context parameters: Asset received via '{threat_context}'. Filename: {filename}. Synthesize a structured forensic analysis mapping. Output exclusively plain valid JSON string profile configuration without using double quotes inside string values."
+                            "text": prompt_text
                         },
                         {
                             "type": "image_url", 
-                            "image_url": {"url": f"data:{content_type};base64,{base64_image}"}
+                            "image_url": {"url": f"data:{image_mime};base64,{base64_payload}"}
                         }
                     ]
                 }
             ]
-            model_engine = "qwen/qwen3.6-27b"
+            model_engine = MODEL_VISION
         else:
             messages = [
                 {
                     "role": "system",
                     "content": (
-                        "You are an expert Audio/Video Deepfake Forensic System. Evaluate the contextual inputs to flag "
-                        "vocal rhythm synthesis signatures, room echo absence, or visual framing shifts.\n\n"
+                        "You are an expert Audio/Video Deepfake Forensics Auditor.\n"
+                        "Analyze the metadata context and descriptors for deepfake indicators such as spectral inconsistency, lip sync desynchronization, or voice synthesis artifacts.\n\n"
                         "CRITICAL STRUCTURAL & SYNTAX RULES:\n"
-                        "1. Output your response exclusively as a single, valid JSON object matching the blueprint layout.\n"
-                        "2. DO NOT use double quotes (\") inside text values or descriptions. Use single quotes (') for any internal quotes.\n"
-                        "3. Do not wrap inside markdown code blocks or add conversational prose.\n"
-                        "4. Ensure NO trailing commas in lists or key-value structures.\n\n"
-                        "Format exactly like this:\n"
+                        "1. Output your entire findings as a single, valid JSON object.\n"
+                        "2. DO NOT use double quotes (\") inside text values or descriptions. Use single quotes (') for internal quotes.\n"
+                        "3. Do not include markdown code block formatting (e.g. ```json).\n"
+                        "4. Ensure strict valid JSON syntax with NO trailing commas.\n\n"
+                        "Format your JSON output EXACTLY matching this schema:\n"
                         "{\n"
-                        "  \"score\": 65,\n"
-                        "  \"label\": \"MEDIUM RISK\",\n"
-                        "  \"colorClass\": \"bg-amber-500\",\n"
-                        "  \"textHex\": \"text-amber-400\",\n"
-                        "  \"glow\": \"shadow-[0_0_15px_#f59e0b]\",\n"
+                        "  \"score\": 85,\n"
+                        "  \"label\": \"HIGH RISK\",\n"
+                        "  \"colorClass\": \"bg-rose-500\",\n"
+                        "  \"textHex\": \"text-rose-400\",\n"
+                        "  \"glow\": \"shadow-[0_0_15px_#f43f5e]\",\n"
                         "  \"indicators\": [\n"
                         "    {\"title\": \"Artifact Title\", \"desc\": \"Analytical description\", \"state\": \"Status\", \"flag\": true, \"tip\": \"Detailed hover tooltip explanation\"}\n"
                         "  ],\n"
-                        "  \"heatmap\": [],\n"
-                        "  \"shieldText\": \"Grandparent shield breakdown summary text\",\n"
-                        "  \"shieldAction\": \"Direct operational action recommendation instruction\"\n"
+                        "  \"heatmap\": [\n"
+                        "    {\"top\": 10, \"left\": 10, \"width\": 80, \"height\": 80, \"label\": \"Full Audio/Visual Stream Flagged\"}\n"
+                        "  ],\n"
+                        "  \"shieldText\": \"Summary of audio/video breakdown findings\",\n"
+                        "  \"shieldAction\": \"Direct operational instruction for non-technical user\"\n"
                         "}"
                     )
                 },
                 {
                     "role": "user",
-                    "content": f"Context Profile: {threat_context}. Filename: {filename}. Media Classification: {content_type}. Synthesize a deepfake forensic analysis matrix. Return strictly a raw JSON schema structure."
+                    "content": f"Filename: '{filename}', Type: '{content_type}', Vector: '{threat_context}'. Evaluate for synthetic voice or frame-rate anomalies and return raw JSON."
                 }
             ]
-            model_engine = "llama-3.3-70b-versatile"
+            model_engine = MODEL_TEXT
 
-        completion = groq_client.chat.completions.create(
+        # Execute Groq call enforcing JSON mode.
+        completion_kwargs = dict(
             model=model_engine,
             messages=messages,
-            temperature=0.0,
-            max_tokens=2048
+            temperature=0.1,
+            max_tokens=2048,
+            response_format={"type": "json_object"}
         )
-        
-        raw_output = completion.choices[0].message.content
-        forensic_report = extract_and_parse_json(raw_output)
-        
-        forensic_report["engine_mode"] = f"Groq Live AI ({model_engine})"
-        forensic_report["diagnostic_log"] = "Connection successful. Output generated directly via live remote hardware."
-        return jsonify(forensic_report)
+        if model_engine == MODEL_VISION:
+            completion_kwargs["reasoning_effort"] = "none"
 
-    except Exception as server_error:
-        filename_lower = filename.lower()
-        if any(ext in filename_lower for ext in ['.wav', '.mp3', '.m4a', '.ogg']):
-            fallback_designator = 'audio'
-        elif any(ext in filename_lower for ext in ['.mp4', '.mov', '.avi', '.webm']):
-            fallback_designator = 'video'
-        else:
-            fallback_designator = 'image'
-            
-        error_context_msg = f"Groq API Server Execution Call Failed: {str(server_error)}"
-        return jsonify(generate_local_forensic_report(threat_context, fallback_designator, uploaded_file, error_context_msg))
+        completion = groq_client.chat.completions.create(**completion_kwargs)
 
-def generate_local_forensic_report(context, mock_type, file_instance, system_log_trace):
-    """Generates localized dynamic reports based on cryptographic MD5 hashing to ensure data-driven variance."""
-    effective_type = mock_type
-    filename = "sandbox_sample"
-    
-    if file_instance:
-        filename = file_instance.filename
-        name_lower = filename.lower()
-        if not effective_type:
-            if any(ext in name_lower for ext in ['.wav', '.mp3', '.m4a', '.ogg']):
-                effective_type = 'audio'
-            elif any(ext in name_lower for ext in ['.mp4', '.mov', '.avi', '.webm']):
-                effective_type = 'video'
-            else:
-                effective_type = 'image'
+        raw_response = completion.choices[0].message.content
+        parsed_analysis = extract_and_parse_json(raw_response)
 
-    hash_base = f"{filename}-{context}-{effective_type}"
-    digest_bytes = hashlib.md5(hash_base.encode('utf-8')).digest()
-    hash_seed = sum(digest_bytes)
-    
-    if effective_type == 'audio':
-        score = 75 + (hash_seed % 21)
-        return {
-            "score": score,
-            "label": "HIGH RISK",
-            "colorClass": "bg-red-500 animate-pulse",
-            "textHex": "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]",
-            "glow": "shadow-[0_0_20px_#ef4444]",
-            "engine_mode": "Local Simulation Engine",
-            "diagnostic_log": system_log_trace,
-            "indicators": [
-                {
-                    "title": "Harmonic Spectral Discontinuity",
-                    "desc": "Artificial synthetic frequency iterations identified along continuous voice bands.",
-                    "state": "Anomaly Triggered",
-                    "flag": True,
-                    "tip": "Generative AI speech loops omit subtle physiological breath micropauses."
-                },
-                {
-                    "title": "Background Phase Coherence",
-                    "desc": "Synthesized voice tracks lack authentic surrounding room resonance variables.",
-                    "state": "Phase Drop",
-                    "flag": True,
-                    "tip": "Deepfake audio splices clean speech paths straight into simulated telephone static pipelines."
-                }
-            ],
-            "heatmap": [],
-            "shieldText": f"WARNING: Secure simulations match Grandchild Voice Cloning Fraud behaviors (Hash-Variance: {hash_seed % 100}).",
-            "shieldAction": "Call your family member back directly on their normal phone number to check if they are safe."
-        }
-        
-    elif effective_type == 'video':
-        score = 70 + (hash_seed % 20)
-        return {
-            "score": score,
-            "label": "HIGH RISK",
-            "colorClass": "bg-red-500",
-            "textHex": "text-red-400",
-            "glow": "shadow-[0_0_15px_#ef4444]",
-            "engine_mode": "Local Simulation Engine",
-            "diagnostic_log": system_log_trace,
-            "indicators": [
-                {
-                    "title": "Spatial Lip-Sync Fluidity",
-                    "desc": "Vocal track frequencies drift slightly out of frame layout step.",
-                    "state": "Mismatched Sync",
-                    "flag": True,
-                    "tip": "Synthesized voice overlays experience network processing lag, leaving physical mouth vectors misaligned."
-                },
-                {
-                    "title": "Asymmetric Facial Movement",
-                    "desc": "Eye-blinking cadences deviate from normal human continuous baselines.",
-                    "state": "Drift Alert",
-                    "flag": True,
-                    "tip": "Biometric synthesis networks generate facial tracking nodes out of sync with logical anatomical rhythms."
-                }
-            ],
-            "heatmap": [],
-            "shieldText": "ATTENTION: Local validation signature indicates synthesis anomalies matching high-pressure corporate authority phishing tricks.",
-            "shieldAction": "Verify structural identities through an alternate separate communication channel before processing requests."
-        }
-        
-    elif effective_type == 'clean':
-        score = 8 + (hash_seed % 15)
-        return {
-            "score": score,
-            "label": "LOW RISK",
-            "colorClass": "bg-emerald-500",
-            "textHex": "text-emerald-400",
-            "glow": "shadow-[0_0_15px_#10b981]",
-            "engine_mode": "Local Simulation Engine",
-            "diagnostic_log": system_log_trace,
-            "indicators": [
-                {
-                    "title": "Acoustic Metadata Verification",
-                    "desc": "Natural background sound distributions verified successfully.",
-                    "state": "Clean",
-                    "flag": False,
-                    "tip": "Ambient noise components match standard microphone capture profiles perfectly."
-                },
-                {
-                    "title": "Geometric Facial Fluidity",
-                    "desc": "No structural pixel micro-warping mapped across skin structures.",
-                    "state": "Passed",
-                    "flag": False,
-                    "tip": "Consistent light profiles are maintained perfectly across all moving screen layers."
-                }
-            ],
-            "heatmap": [],
-            "shieldText": "This communication displays standard human structural attributes. No signs of digital synthesis mapped.",
-            "shieldAction": "No protective actions required. Maintain general digital communication safety habits."
-        }
-        
-    else:
-        score = 38 + (hash_seed % 51)
-        label = "HIGH RISK" if score >= 70 else "MEDIUM RISK"
-        color = "bg-red-500" if score >= 70 else "bg-amber-500"
-        text_color = "text-red-400" if score >= 70 else "text-amber-400"
-        glow_val = "shadow-[0_0_15px_#ef4444]" if score >= 70 else "shadow-[0_0_15px_#f59e0b]"
-        
-        heatmap_points = []
-        if score >= 40:
-            heatmap_points = [
-                {
-                    "top": 25 + (hash_seed % 15),
-                    "left": 30 + (hash_seed % 25),
-                    "width": 18,
-                    "height": 18,
-                    "label": "Local Edge Compression Anomaly"
-                },
-                {
-                    "top": 55 + (hash_seed % 10),
-                    "left": 40 + (hash_seed % 20),
-                    "width": 14,
-                    "height": 14,
-                    "label": "Synthetic Contrast Boundary Split"
-                }
-            ]
+        return jsonify({
+            'success': True,
+            'engine_mode': f'Groq Live AI ({model_engine})',
+            'diagnostic_log': f'Successfully executed inference via {model_engine}. Stream parsed cleanly.',
+            **parsed_analysis
+        })
 
-        return {
-            "score": score,
-            "label": label,
-            "colorClass": color,
-            "textHex": text_color,
-            "glow": glow_val,
-            "engine_mode": "Local Simulation Engine",
-            "diagnostic_log": system_log_trace,
-            "indicators": [
-                {
-                    "title": "Illumination Vector Gradient",
-                    "desc": "Asymmetric lighting distributions found along foreground profile vector borders.",
-                    "state": "Irregularity Flagged",
-                    "flag": True,
-                    "tip": "Generative networks struggle to match real background lighting environments seamlessly with synthetic overlays."
-                },
-                {
-                    "title": "Error Level Analysis (ELA) Variance",
-                    "desc": f"Edge contour grids reveal local pixel compression anomalies at signature node-{hash_seed % 9}.",
-                    "state": "Warp Detected",
-                    "flag": True,
-                    "tip": "AI generative filters introduce localized noise variations when digitally grafting structural elements onto authentic layers."
-                }
-            ],
-            "heatmap": heatmap_points,
-            "shieldText": f"ATTENTION: Localized visual signature checks compute a dynamic index value of {score}% for this object file profile.",
-            "shieldAction": "Do not verify identity based on profile images alone. Request real-time uncompressed confirmation vectors."
-        }
+    except Exception as e:
+        err_msg = str(e)
+        stack = traceback.format_exc()
+        simulated = generate_simulated_report(filename, media_type, threat_context)
+        return jsonify({
+            'success': True,
+            'engine_mode': 'Local Simulation Engine',
+            'diagnostic_log': f'Groq API Execution Call Failed: {err_msg}\n{stack}',
+            **simulated
+        })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
